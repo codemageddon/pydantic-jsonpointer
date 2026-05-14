@@ -38,3 +38,11 @@ run = "uv run pytest"
 [tasks.ci]
 description = "Run all CI checks (ruff + mypy + pytest)"
 depends = ["ruff", "mypy", "pytest"]
+
+[tasks."docs:serve"]
+description = "Serve the docs site locally with live reload"
+run = "uv run --group docs mkdocs serve --watch src"
+
+[tasks."docs:build"]
+description = "Build the docs site in strict mode"
+run = "uv run --group docs mkdocs build --strict"

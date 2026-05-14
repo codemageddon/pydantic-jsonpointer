@@ -1,0 +1,5 @@
+/* pydantic-jsonpointer documentation custom styles */
+
+.md-typeset pre {
+  max-width: 100%;
+}
