@@ -6,27 +6,34 @@ pre-commit = "4"
 [env]
 UV_NO_MANAGED_PYTHON = true
 
-[tasks.ruff]
-description = "Lint + format check (mirrors CI 'ruff' job)"
+[tasks.setup]
+description = "Bootstrap dev environment (uv sync + install pre-commit git hook)"
 run = [
-    "uv sync --frozen",
+    { task = "sync" },
+    "pre-commit install",
+]
+
+[tasks.sync]
+description = "Install dependencies from the lockfile (uv sync --frozen)"
+run = "uv sync --frozen"
+
+[tasks.ruff]
+description = "Lint + format check"
+depends = ["sync"]
+run = [
     "uv run ruff check .",
     "uv run ruff format --check .",
 ]
 
 [tasks.mypy]
-description = "Strict type check (mirrors CI 'mypy' job)"
-run = [
-    "uv sync --frozen",
-    "uv run mypy src tests",
-]
+description = "Strict type check"
+depends = ["sync"]
+run = "uv run mypy src tests"
 
 [tasks.pytest]
-description = "Run test suite (mirrors CI 'pytest' job)"
-run = [
-    "uv sync --frozen",
-    "uv run pytest",
-]
+description = "Run test suite"
+depends = ["sync"]
+run = "uv run pytest"
 
 [tasks.ci]
 description = "Run all CI checks (ruff + mypy + pytest)"
