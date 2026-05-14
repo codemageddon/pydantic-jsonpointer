@@ -65,7 +65,9 @@ def test_constructor_rejects_non_string_with_type_error(value: object) -> None:
         ("/m~0n", ("m~n",)),
     ],
 )
-def test_tokens_rfc6901_examples(pointer_str: str, expected_tokens: tuple[str, ...]) -> None:
+def test_tokens_rfc6901_examples(
+    pointer_str: str, expected_tokens: tuple[str, ...]
+) -> None:
     ptr = JsonPointer(pointer_str)
     assert ptr.tokens == expected_tokens
 

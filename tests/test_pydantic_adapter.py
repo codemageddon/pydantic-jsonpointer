@@ -231,7 +231,9 @@ def test_basemodel_resolve_token_unknown_field_raises() -> None:
         a.resolve_token(_Doc(), "missing")
 
 
-def test_basemodel_resolve_token_with_aliased_model_rejects_attr_under_default() -> None:
+def test_basemodel_resolve_token_with_aliased_model_rejects_attr_under_default() -> (
+    None
+):
     a = BaseModelAdapter()
     # Default resolver is BySerializationAlias, so the attribute name is
     # not a valid token for an aliased field.
@@ -456,7 +458,9 @@ def test_basemodel_has_false_for_unset_field_on_model_construct() -> None:
     assert a.has(doc, "y") is True
 
 
-def test_basemodel_get_unset_field_raises_pointer_not_found_not_attribute_error() -> None:
+def test_basemodel_get_unset_field_raises_pointer_not_found_not_attribute_error() -> (
+    None
+):
     a = BaseModelAdapter()
     doc = _ConstructDoc.model_construct()
     with pytest.raises(PointerNotFoundError, match="not set on this instance"):
@@ -514,6 +518,7 @@ def test_basemodel_remove_through_pep695_type_alias() -> None:
 
     class M(BaseModel):
         x: MaybeStr = "hi"
+
     a = BaseModelAdapter()
     m = M(x="hi")
     assert a.remove(m, "x") == "hi"
@@ -531,6 +536,7 @@ def test_basemodel_remove_pep695_alias_without_none_still_refuses() -> None:
 
     class M(BaseModel):
         x: NeverNull = "hi"
+
     a = BaseModelAdapter()
     m = M(x="hi")
     with pytest.raises(InvalidTokenError, match="non-Optional"):

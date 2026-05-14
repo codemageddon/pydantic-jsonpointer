@@ -252,9 +252,7 @@ class BaseModelAdapter:
     def get(self, parent: BaseModel, key: int | str) -> Any:
         model_cls = type(parent)
         if key not in model_cls.model_fields:
-            raise PointerNotFoundError(
-                f"{model_cls.__name__} has no field {key!r}"
-            )
+            raise PointerNotFoundError(f"{model_cls.__name__} has no field {key!r}")
         try:
             return getattr(parent, str(key))
         except AttributeError as exc:
@@ -266,9 +264,7 @@ class BaseModelAdapter:
     def set(self, parent: BaseModel, key: int | str, value: Any) -> None:
         model_cls = type(parent)
         if key not in model_cls.model_fields:
-            raise PointerNotFoundError(
-                f"{model_cls.__name__} has no field {key!r}"
-            )
+            raise PointerNotFoundError(f"{model_cls.__name__} has no field {key!r}")
         # Mirror ``has``: ``model_construct()`` can leave a declared field
         # without a value on the instance. JSON-Patch ``replace`` requires the
         # slot to already exist, so refuse rather than silently materializing
@@ -286,17 +282,13 @@ class BaseModelAdapter:
         # field that ``model_construct()`` left unset on the instance.
         model_cls = type(parent)
         if key not in model_cls.model_fields:
-            raise PointerNotFoundError(
-                f"{model_cls.__name__} has no field {key!r}"
-            )
+            raise PointerNotFoundError(f"{model_cls.__name__} has no field {key!r}")
         setattr(parent, str(key), value)
 
     def remove(self, parent: BaseModel, key: int | str) -> Any:
         model_cls = type(parent)
         if key not in model_cls.model_fields:
-            raise PointerNotFoundError(
-                f"{model_cls.__name__} has no field {key!r}"
-            )
+            raise PointerNotFoundError(f"{model_cls.__name__} has no field {key!r}")
         if not _annotation_accepts_none(model_cls, str(key)):
             raise InvalidTokenError(
                 f"cannot remove non-Optional field "

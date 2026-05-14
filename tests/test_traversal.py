@@ -378,7 +378,7 @@ _RFC6901_DOC: dict[str, Any] = {
     "e^f": 3,
     "g|h": 4,
     "i\\j": 5,
-    "k\"l": 6,
+    'k"l': 6,
     " ": 7,
     "m~n": 8,
 }
@@ -396,7 +396,7 @@ _RFC6901_DOC: dict[str, Any] = {
         ("/e^f", 3),
         ("/g|h", 4),
         ("/i\\j", 5),
-        ("/k\"l", 6),
+        ('/k"l', 6),
         ("/ ", 7),
         ("/m~0n", 8),
     ],
@@ -670,8 +670,8 @@ def test_public_imports_are_importable_by_name() -> None:
         PointerNotFoundError,
         Ptr,
         RootRebindError,
-        add_value,
         adapter_for,
+        add_value,
         get_value,
         register,
         remove_value,
@@ -748,9 +748,7 @@ def test_remove_value_threads_resolver() -> None:
     from pydantic_jsonpointer import ByAttribute as _ByAttribute
 
     doc = _AliasedOptional()
-    assert (
-        remove_value(doc, JsonPointer("/user_name"), resolver=_ByAttribute()) == "x"
-    )
+    assert remove_value(doc, JsonPointer("/user_name"), resolver=_ByAttribute()) == "x"
     assert doc.user_name is None
 
 
@@ -765,9 +763,7 @@ def test_resolve_threads_resolver_into_nested_models() -> None:
 
     doc = _Outer()
     # Under ByAttribute, both outer and inner are accessed by attr name.
-    assert (
-        get_value(doc, JsonPointer("/inner/thing"), resolver=_ByAttribute()) == "hi"
-    )
+    assert get_value(doc, JsonPointer("/inner/thing"), resolver=_ByAttribute()) == "hi"
     # Under default resolver, the inner field needs its serialization_alias "t".
     assert get_value(doc, JsonPointer("/inner/t")) == "hi"
 
@@ -917,9 +913,7 @@ class _FrozenInnerWrap(_RootModel[list[int]]):
 
 
 class _OuterHostsFrozenRootModel(_BM):
-    inner: _FrozenInnerWrap = _F(
-        default_factory=lambda: _FrozenInnerWrap([1, 2, 3])
-    )
+    inner: _FrozenInnerWrap = _F(default_factory=lambda: _FrozenInnerWrap([1, 2, 3]))
 
 
 def test_frozen_rootmodel_nested_under_normal_model_taints_descendants() -> None:
@@ -1022,7 +1016,7 @@ def test_field_frozen_rootmodel_nested_under_normal_model_taints_descendants() -
         ("/e^f", 3),
         ("/g|h", 4),
         ("/i\\j", 5),
-        ("/k\"l", 6),
+        ('/k"l', 6),
         ("/ ", 7),
         ("/m~0n", 8),
     ],

@@ -135,9 +135,7 @@ class DictAdapter:
 
     def set(self, parent: Any, key: int | str, value: Any) -> None:
         if key not in parent:
-            raise PointerNotFoundError(
-                f"cannot replace {key!r}: key not present"
-            )
+            raise PointerNotFoundError(f"cannot replace {key!r}: key not present")
         parent[key] = value
 
     def add(self, parent: Any, key: int | str, value: Any) -> None:
@@ -196,9 +194,7 @@ class ListAdapter:
                 "cannot get '-': no element exists at the tail position"
             )
         if not _is_int_index(key):
-            raise InvalidTokenError(
-                f"invalid array index {key!r}: expected int"
-            )
+            raise InvalidTokenError(f"invalid array index {key!r}: expected int")
         if not (0 <= key < len(parent)):
             raise PointerNotFoundError(
                 f"list index {key} out of range (len={len(parent)})"
@@ -211,9 +207,7 @@ class ListAdapter:
                 "cannot replace at '-': no element exists at the tail position"
             )
         if not _is_int_index(key):
-            raise InvalidTokenError(
-                f"invalid array index {key!r}: expected int"
-            )
+            raise InvalidTokenError(f"invalid array index {key!r}: expected int")
         if not (0 <= key < len(parent)):
             raise PointerNotFoundError(
                 f"list index {key} out of range (len={len(parent)})"
@@ -225,9 +219,7 @@ class ListAdapter:
             parent.append(value)
             return
         if not _is_int_index(key):
-            raise InvalidTokenError(
-                f"invalid array index {key!r}: expected int"
-            )
+            raise InvalidTokenError(f"invalid array index {key!r}: expected int")
         if not (0 <= key <= len(parent)):
             raise InvalidTokenError(
                 f"list index {key} out of range for add (len={len(parent)})"
@@ -240,9 +232,7 @@ class ListAdapter:
                 "cannot remove '-': no element exists at the tail position"
             )
         if not _is_int_index(key):
-            raise InvalidTokenError(
-                f"invalid array index {key!r}: expected int"
-            )
+            raise InvalidTokenError(f"invalid array index {key!r}: expected int")
         if not (0 <= key < len(parent)):
             raise PointerNotFoundError(
                 f"list index {key} out of range (len={len(parent)})"

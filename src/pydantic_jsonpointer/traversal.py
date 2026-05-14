@@ -156,9 +156,7 @@ class _RootSentinelAdapter:
 
     @staticmethod
     def _unreachable() -> Any:
-        raise AssertionError(
-            "internal: root sentinel adapter must not be invoked"
-        )
+        raise AssertionError("internal: root sentinel adapter must not be invoked")
 
     def resolve_token(self, parent: Any, raw_token: str) -> int | str:
         return self._unreachable()  # type: ignore[no-any-return]
@@ -188,9 +186,7 @@ class _RootSentinelAdapter:
 _ROOT_SENTINEL_ADAPTER: ContainerAdapter = _RootSentinelAdapter()
 
 
-def _unwrap_to_fixed_point(
-    value: Any, *, resolver: Any = None
-) -> tuple[Any, bool]:
+def _unwrap_to_fixed_point(value: Any, *, resolver: Any = None) -> tuple[Any, bool]:
     """Repeatedly apply the current adapter's ``unwrap`` until it returns ``...``.
 
     Lets transparent wrappers (e.g. ``RootModel``) be invisible to the walker.

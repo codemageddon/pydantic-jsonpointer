@@ -26,7 +26,9 @@ def test_pointer_error_is_exception() -> None:
         (ImmutableTargetError, ()),
     ],
 )
-def test_subclass_hierarchy(cls: type[Exception], extra_bases: tuple[type, ...]) -> None:
+def test_subclass_hierarchy(
+    cls: type[Exception], extra_bases: tuple[type, ...]
+) -> None:
     assert issubclass(cls, PointerError)
     for base in extra_bases:
         assert issubclass(cls, base)

@@ -46,9 +46,7 @@ class JsonPointer(str):
 
     def __new__(cls, value: str = "") -> Self:
         if not isinstance(value, str):
-            msg = (
-                f"JsonPointer requires a str, got {type(value).__name__}"
-            )
+            msg = f"JsonPointer requires a str, got {type(value).__name__}"
             raise TypeError(msg)
         if value != "" and not value.startswith("/"):
             msg = f"JSON Pointer must be empty or start with '/': {value!r}"
@@ -57,7 +55,9 @@ class JsonPointer(str):
             msg = f"Invalid escape in JSON Pointer (~ must be followed by 0 or 1): {value!r}"
             raise ValueError(msg)
         tokens: tuple[str, ...] = (
-            () if value == "" else tuple(_unescape_token(t) for t in value[1:].split("/"))
+            ()
+            if value == ""
+            else tuple(_unescape_token(t) for t in value[1:].split("/"))
         )
         return cls.__with_tokens(value, tokens)
 
@@ -115,4 +115,3 @@ class JsonPointer(str):
     def tokens(self) -> tuple[str, ...]:
         """Decompose into unescaped reference tokens."""
         return self._tokens
-
