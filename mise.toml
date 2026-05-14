@@ -5,3 +5,44 @@ pre-commit = "4"
 
 [env]
 UV_NO_MANAGED_PYTHON = true
+
+[tasks.setup]
+description = "Bootstrap dev environment (uv sync + install pre-commit git hook)"
+run = [
+    { task = "sync" },
+    "pre-commit install",
+]
+
+[tasks.sync]
+description = "Install dependencies from the lockfile (uv sync --frozen)"
+run = "uv sync --frozen"
+
+[tasks.ruff]
+description = "Lint + format check"
+depends = ["sync"]
+run = [
+    "uv run ruff check .",
+    "uv run ruff format --check .",
+]
+
+[tasks.mypy]
+description = "Strict type check"
+depends = ["sync"]
+run = "uv run mypy src tests"
+
+[tasks.pytest]
+description = "Run test suite"
+depends = ["sync"]
+run = "uv run pytest"
+
+[tasks.ci]
+description = "Run all CI checks (ruff + mypy + pytest)"
+depends = ["ruff", "mypy", "pytest"]
+
+[tasks."docs:serve"]
+description = "Serve the docs site locally with live reload"
+run = "uv run --group docs mkdocs serve --watch src"
+
+[tasks."docs:build"]
+description = "Build the docs site in strict mode"
+run = "uv run --group docs mkdocs build --strict"
