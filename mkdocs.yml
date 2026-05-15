@@ -9,6 +9,8 @@ docs_dir: docs
 
 theme:
   name: material
+  logo: assets/logo.png
+  favicon: assets/logo.png
   features:
     - navigation.tabs
     - navigation.sections
@@ -78,12 +80,14 @@ nav:
   - Concepts:
       - concepts/index.md
       - JsonPointer type: concepts/json-pointer.md
+      - Model-based pointers: concepts/model-based-pointers.md
       - Traversal: concepts/traversal.md
       - Adapters: concepts/adapters.md
       - Field resolvers: concepts/field-resolvers.md
       - Errors: concepts/errors.md
   - API Reference:
       - reference/index.md
+      - pointer_from_model: reference/model-path.md
       - pydantic_jsonpointer.types: reference/types.md
       - pydantic_jsonpointer.traversal: reference/traversal.md
       - pydantic_jsonpointer.adapters: reference/adapters.md

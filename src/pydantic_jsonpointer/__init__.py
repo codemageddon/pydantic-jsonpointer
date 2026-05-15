@@ -7,6 +7,7 @@ the box without explicit setup.
 
 from pydantic import BaseModel as _BaseModel
 
+from ._model_path import pointer_from_model
 from .adapters import ContainerAdapter, adapter_for, register
 from .errors import (
     AdapterNotFoundError,
@@ -37,6 +38,7 @@ register(_BaseModel, BaseModelAdapter(), override=True)
 
 __all__ = [
     "JsonPointer",
+    "pointer_from_model",
     "Ptr",
     "resolve",
     "get_value",

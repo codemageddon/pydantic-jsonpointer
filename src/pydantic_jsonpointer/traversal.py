@@ -316,7 +316,8 @@ def resolve(doc: Any, pointer: JsonPointer, *, resolver: Any = None) -> Ptr:
     last: Ptr | None = None
     for ptr in _iter_resolve(doc, pointer, resolver=resolver):
         last = ptr
-    assert last is not None
+    if last is None:
+        raise PointerError("internal: _iter_resolve yielded no Ptr")
     return last
 
 

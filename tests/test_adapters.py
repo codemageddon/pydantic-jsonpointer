@@ -8,11 +8,13 @@ from pydantic_jsonpointer.adapters import (
     ContainerAdapter,
     DictAdapter,
     ListAdapter,
+    TupleAdapter,
     adapter_for,
     register,
 )
 from pydantic_jsonpointer.errors import (
     AdapterNotFoundError,
+    ImmutableTargetError,
     InvalidTokenError,
     PointerNotFoundError,
 )
@@ -401,6 +403,88 @@ def test_adapter_for_resolver_preserves_basemodel_adapter_subclass() -> None:
     register(_M, _Override(), override=True)
     a = adapter_for(_M(), resolver=ByAttribute())
     assert isinstance(a, _Override)
+
+
+def test_tuple_adapter_auto_registered() -> None:
+    assert isinstance(adapter_for((1, 2, 3)), TupleAdapter)
+
+
+def test_tuple_adapter_satisfies_protocol() -> None:
+    assert isinstance(TupleAdapter(), ContainerAdapter)
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("0", 0),
+        ("1", 1),
+        ("42", 42),
+    ],
+)
+def test_tuple_resolve_token_valid(raw: str, expected: int) -> None:
+    assert TupleAdapter().resolve_token((10, 20, 30), raw) == expected
+
+
+@pytest.mark.parametrize(
+    "bad",
+    ["", "01", "-", "-1", "foo", "١٢٣"],
+)
+def test_tuple_resolve_token_invalid(bad: str) -> None:
+    with pytest.raises(InvalidTokenError):
+        TupleAdapter().resolve_token((1, 2), bad)
+
+
+def test_tuple_has_in_range() -> None:
+    a = TupleAdapter()
+    t = (10, 20, 30)
+    assert a.has(t, 0) is True
+    assert a.has(t, 2) is True
+
+
+def test_tuple_has_out_of_range() -> None:
+    assert TupleAdapter().has((10, 20), 3) is False
+
+
+def test_tuple_get_in_range() -> None:
+    assert TupleAdapter().get((10, 20, 30), 1) == 20
+
+
+def test_tuple_get_out_of_range_raises() -> None:
+    with pytest.raises(PointerNotFoundError):
+        TupleAdapter().get((10, 20), 5)
+
+
+def test_tuple_set_raises_immutable() -> None:
+    with pytest.raises(ImmutableTargetError):
+        TupleAdapter().set((10, 20), 0, 99)
+
+
+def test_tuple_set_missing_slot_raises_immutable() -> None:
+    with pytest.raises(ImmutableTargetError):
+        TupleAdapter().set((10, 20), 5, 99)
+
+
+def test_tuple_add_raises_immutable() -> None:
+    with pytest.raises(ImmutableTargetError):
+        TupleAdapter().add((10, 20), 0, 99)
+
+
+def test_tuple_remove_raises_immutable() -> None:
+    with pytest.raises(ImmutableTargetError):
+        TupleAdapter().remove((10, 20), 0)
+
+
+def test_tuple_remove_missing_slot_raises_immutable() -> None:
+    with pytest.raises(ImmutableTargetError):
+        TupleAdapter().remove((10, 20), 5)
+
+
+def test_tuple_unwrap_is_ellipsis_sentinel() -> None:
+    assert TupleAdapter().unwrap((1, 2)) is ...
+
+
+def test_tuple_is_step_frozen_is_false() -> None:
+    assert TupleAdapter().is_step_frozen((1, 2), 0) is False
 
 
 def test_adapter_for_resolver_preserves_subclass_state_and_custom_init() -> None:

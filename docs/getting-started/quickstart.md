@@ -21,6 +21,39 @@ JsonPointer("items/0")  # raises InvalidTokenError — missing leading "/"
 JsonPointer("/~2")      # raises InvalidTokenError — "~" must be followed by 0 or 1
 ```
 
+### From model attributes
+
+Use `pointer_from_model` to construct pointers from Pydantic model attribute chains with automatic alias resolution:
+
+```python
+from pydantic import BaseModel
+from pydantic_jsonpointer import pointer_from_model
+
+
+class Address(BaseModel):
+    city: str
+
+
+class User(BaseModel):
+    name: str
+    address: Address
+
+
+pointer_from_model(User).address.city.build()  # → JsonPointer("/address/city")
+```
+
+Each attribute step returns a `_ModelPath` proxy. Call `.build()` (or its `()` alias) to finalize into a `JsonPointer`. The `/` operator also finalizes immediately.
+
+List fields support `[index]` access:
+
+```python
+class Order(BaseModel):
+    items: list[Address]
+
+
+pointer_from_model(Order).items[0].city.build()  # → JsonPointer("/items/0/city")
+```
+
 ## Read a value
 
 ```python
@@ -107,6 +140,7 @@ add_value(nums, JsonPointer("/-"), 40)      # nums.root -> [10, 20, 30, 40]
 
 ## What's next
 
+- [Model-based pointers](../concepts/model-based-pointers.md) — build pointers from model attribute chains
 - [JsonPointer type](../concepts/json-pointer.md) — escape rules, Pydantic integration, the `_tokens` invariant
 - [Traversal](../concepts/traversal.md) — the `Ptr` handle, frozen taint, mutation guards
 - [Adapters](../concepts/adapters.md) — write an adapter for your own container type

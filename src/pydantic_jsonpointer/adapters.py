@@ -16,7 +16,12 @@ from __future__ import annotations
 
 from typing import Any, Protocol, TypeGuard, runtime_checkable
 
-from .errors import AdapterNotFoundError, InvalidTokenError, PointerNotFoundError
+from .errors import (
+    AdapterNotFoundError,
+    ImmutableTargetError,
+    InvalidTokenError,
+    PointerNotFoundError,
+)
 
 
 def _is_ascii_digits(s: str) -> bool:
@@ -247,3 +252,62 @@ class ListAdapter:
 
 
 register(list, ListAdapter())
+
+
+class TupleAdapter:
+    """Adapter for built-in ``tuple`` containers (read-only).
+
+    Tuples are immutable: ``set``, ``add``, and ``remove`` all raise
+    ``ImmutableTargetError``. ``is_step_frozen`` returns ``False`` so that
+    mutable objects *inside* a tuple slot remain writable via their own
+    adapters.
+    """
+
+    def resolve_token(self, parent: Any, raw_token: str) -> int:
+        if not raw_token or not _is_ascii_digits(raw_token):
+            raise InvalidTokenError(
+                f"invalid tuple index {raw_token!r}: expected non-negative decimal"
+            )
+        if len(raw_token) > 1 and raw_token[0] == "0":
+            raise InvalidTokenError(
+                f"invalid tuple index {raw_token!r}: leading zero not permitted"
+            )
+        return int(raw_token)
+
+    def has(self, parent: Any, key: int | str) -> bool:
+        if not _is_int_index(key):
+            return False
+        return 0 <= key < len(parent)
+
+    def get(self, parent: Any, key: int | str) -> Any:
+        if not _is_int_index(key):
+            raise InvalidTokenError(f"invalid tuple index {key!r}: expected int")
+        if not (0 <= key < len(parent)):
+            raise PointerNotFoundError(
+                f"tuple index {key} out of range (len={len(parent)})"
+            )
+        return parent[key]
+
+    def set(self, parent: Any, key: int | str, value: Any) -> None:
+        if not _is_int_index(key):
+            raise InvalidTokenError(f"invalid tuple index {key!r}: expected int")
+        raise ImmutableTargetError("cannot modify tuple element: tuples are immutable")
+
+    def add(self, parent: Any, key: int | str, value: Any) -> None:
+        if not _is_int_index(key):
+            raise InvalidTokenError(f"invalid tuple index {key!r}: expected int")
+        raise ImmutableTargetError("cannot add to tuple: tuples are immutable")
+
+    def remove(self, parent: Any, key: int | str) -> Any:
+        if not _is_int_index(key):
+            raise InvalidTokenError(f"invalid tuple index {key!r}: expected int")
+        raise ImmutableTargetError("cannot remove from tuple: tuples are immutable")
+
+    def unwrap(self, value: Any) -> Any:
+        return ...
+
+    def is_step_frozen(self, parent: Any, key: int | str) -> bool:
+        return False
+
+
+register(tuple, TupleAdapter())
