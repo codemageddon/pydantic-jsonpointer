@@ -1,0 +1,73 @@
+# Trusted Publisher Configuration (Production PyPI)
+#
+# For this workflow to publish via OIDC trusted publishing, the package must
+# have a trusted publisher configured in its PyPI project settings at:
+#   https://pypi.org/manage/project/pydantic-jsonpointer/settings/publishing/
+#
+# Trusted publisher settings:
+#   Owner:         codemageddon
+#   Repository:    pydantic-jsonpointer
+#   Workflow name: publish.yaml
+#   Environment:   pypi
+
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  verify-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify VERSION matches the tag
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "Tag version: ${TAG_VERSION}"
+          PKG_VERSION=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' src/pydantic_jsonpointer/__version__.py)
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch: got '${PKG_VERSION}', expected '${TAG_VERSION}'"
+            exit 1
+          fi
+          echo "Version matches tag ${GITHUB_REF_NAME}"
+
+  build:
+    needs: verify-versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.14"
+
+      - name: Build package
+        run: uv build --out-dir dist/
+
+      - name: List built distributions
+        run: ls -la dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1.14
+        with:
+          attestations: true
