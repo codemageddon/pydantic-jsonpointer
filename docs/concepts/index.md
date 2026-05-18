@@ -8,6 +8,10 @@ This section explains the design behind `pydantic-jsonpointer`. Read these pages
 
     A `str` subclass with parsed-token storage, RFC 6901 validation in `__new__`, escape/unescape helpers, and full Pydantic v2 schema integration.
 
+- :material-file-tree: **[Model-based pointers](model-based-pointers.md)**
+
+    Building `JsonPointer` strings from Pydantic model attribute chains with `pointer_from_model()`, including Union disambiguation and RootModel entry.
+
 - :material-source-branch: **[Traversal](traversal.md)**
 
     `Ptr` handles, `resolve()` semantics, the four convenience helpers, frozen taint propagation, and the `Ellipsis` sentinel.

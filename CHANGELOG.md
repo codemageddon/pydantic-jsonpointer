@@ -9,7 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `pointer_from_model(model_or_cls, *, resolver=None) -> _ModelPath` — a type-safe builder that produces `JsonPointer` values by navigating Pydantic model fields via attribute access (`pointer_from_model(User).address.city`), list indexing (`[0]`), and raw token escape (`/ "token"`). Accepts both model classes and instances; for Union disambiguation, narrow with `isinstance` and re-enter on the narrowed value. Respects the same `FieldResolver` policies as `resolve()`.
+- `pydantic_jsonpointer.mypy_plugin` — a mypy plugin that validates `pointer_from_model` chains at static-analysis time. Registers unknown-field access as `[attr-defined]` errors and validates chained `.attr` access at every depth. Enable it in `mypy.ini` / `pyproject.toml` via `plugins = pydantic_jsonpointer.mypy_plugin`.
+- Mypy plugin now validates chained `.attr` access at every depth, not only the first. `pointer_from_model(M).a.b.c.typo` errors against the correct nested model.
+- Explicit `.__getitem__(0)` and implicit `[0]` forms are both fully validated: `pointer_from_model(Order).items[0].typo` errors against the item model.
+- Plugin emits an error on ambiguous BaseModel Union fields guiding users to `isinstance` narrowing.
 - Optional `ContainerAdapter.is_value_frozen(value) -> bool` hook. A second freeze-taint source complementing `is_step_frozen` that propagates immutability across `unwrap` chains, fixing transitive freezing for `RootModel` containers declared with `ConfigDict(frozen=True)` or `Field(frozen=True)` on `root`. The hook lives outside the runtime-checkable Protocol surface (probed via `getattr` in the walker), so adapters written against the canonical 8-method contract keep working unchanged.
+
+### Changed (breaking)
+
+- Removed runtime instance-based Union disambiguation from `pointer_from_model`. Previously, passing a model *instance* let `_ModelPath` peek at runtime values to resolve ambiguous Union fields through the chain. Now the chain raises `AttributeError` for ambiguous Unions regardless of class-vs-instance entry. **Migration:** narrow with `isinstance` and re-enter on the narrowed value:
+  ```python
+  # Before
+  ptr = pointer_from_model(event).payload.body
+  # After
+  if isinstance(event.payload, JsonBody):
+      ptr = pointer_from_model(event.payload).body
+  ```
+
+### Removed
+
+- `_unwrap_root_instance` (internal); `_instance` field on `_ModelPath`; `_MISSING` sentinel.
 
 ### Fixed
 

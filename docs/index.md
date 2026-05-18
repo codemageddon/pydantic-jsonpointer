@@ -1,3 +1,7 @@
+<div style="text-align: center; line-height: 1;">
+  <img src="assets/logo-header.png" alt="" width="194" height="96" style="display: inline-block; margin-bottom: 8px;">
+</div>
+
 # pydantic-jsonpointer
 
 **JSONPointer ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) implementation for Pydantic 2.x.** A typed `JsonPointer` string for use in Pydantic models, plus a traversal API that walks `dict` / `list` / `pydantic.BaseModel` graphs through a pluggable adapter protocol.

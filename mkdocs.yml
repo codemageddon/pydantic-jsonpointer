@@ -9,6 +9,8 @@ docs_dir: docs
 
 theme:
   name: material
+  logo: assets/logo-header.png
+  favicon: assets/logo-header.png
   features:
     - navigation.tabs
     - navigation.sections
@@ -22,13 +24,15 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
+      primary: teal
+      accent: green
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
+      primary: teal
+      accent: green
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
@@ -78,12 +82,14 @@ nav:
   - Concepts:
       - concepts/index.md
       - JsonPointer type: concepts/json-pointer.md
+      - Model-based pointers: concepts/model-based-pointers.md
       - Traversal: concepts/traversal.md
       - Adapters: concepts/adapters.md
       - Field resolvers: concepts/field-resolvers.md
       - Errors: concepts/errors.md
   - API Reference:
       - reference/index.md
+      - pointer_from_model: reference/model-path.md
       - pydantic_jsonpointer.types: reference/types.md
       - pydantic_jsonpointer.traversal: reference/traversal.md
       - pydantic_jsonpointer.adapters: reference/adapters.md

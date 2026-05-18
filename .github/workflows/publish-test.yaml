@@ -1,0 +1,172 @@
+# Trusted Publisher Configuration (Test PyPI)
+#
+# For this workflow to publish via OIDC trusted publishing, the package must
+# have a trusted publisher configured in its Test PyPI project settings at:
+#   https://test.pypi.org/manage/project/pydantic-jsonpointer/settings/publishing/
+#
+# Trusted publisher settings:
+#   Owner:         codemageddon
+#   Repository:    pydantic-jsonpointer
+#   Workflow name: publish-test.yaml
+#   Environment:   test-pypi
+
+name: Publish to Test PyPI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      dev-version: ${{ steps.version.outputs.dev-version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.14"
+
+      - name: Append dev version suffix
+        id: version
+        run: |
+          DEV_SUFFIX=".dev$(( ${{ github.run_number }} * 100 + ${{ github.run_attempt }} ))"
+          BASE_VERSION=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' src/pydantic_jsonpointer/__version__.py)
+          DEV_VERSION=$(uv run --with packaging --no-project python -c "from packaging.version import Version; print(Version('${BASE_VERSION}${DEV_SUFFIX}'))")
+          echo "dev-version=${DEV_VERSION}" >> "$GITHUB_OUTPUT"
+          sed -i "s/^VERSION = \"\(.*\)\"/VERSION = \"\1${DEV_SUFFIX}\"/" src/pydantic_jsonpointer/__version__.py
+
+      - name: Build package
+        run: uv build --out-dir dist/
+
+      - name: List built distributions
+        run: ls -la dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  gate:
+    needs: build
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+    steps:
+      - name: Wait for required checks to pass
+        uses: actions/github-script@v7
+        timeout-minutes: 15
+        with:
+          script: |
+            const sha = context.payload.pull_request.head.sha;
+            const required = ['pre-commit', 'ruff', 'mypy'];
+            // pytest uses a matrix, so check names include Python version (e.g. "pytest (py3.10)")
+            const requiredPrefixes = ['pytest ('];
+            const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+            while (true) {
+              const { data } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: sha,
+              });
+
+              let allDone = true;
+              const failures = [];
+
+              for (const name of required) {
+                const check = data.check_runs.find(c => c.name === name);
+                if (!check || check.status !== 'completed') {
+                  allDone = false;
+                  break;
+                }
+                if (check.conclusion !== 'success') {
+                  failures.push(`${name}: ${check.conclusion}`);
+                }
+              }
+
+              if (allDone) {
+                for (const prefix of requiredPrefixes) {
+                  const matching = data.check_runs.filter(c => c.name.startsWith(prefix));
+                  if (matching.length === 0) {
+                    allDone = false;
+                    break;
+                  }
+                  for (const check of matching) {
+                    if (check.status !== 'completed') {
+                      allDone = false;
+                      break;
+                    }
+                    if (check.conclusion !== 'success') {
+                      failures.push(`${check.name}: ${check.conclusion}`);
+                    }
+                  }
+                  if (!allDone) break;
+                }
+              }
+
+              if (allDone) {
+                if (failures.length > 0) {
+                  core.setFailed(`Required checks failed: ${failures.join(', ')}`);
+                } else {
+                  core.info('All required checks passed');
+                }
+                return;
+              }
+
+              core.info('Waiting for required checks to complete...');
+              await sleep(15000);
+            }
+
+  publish:
+    needs: gate
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: test-pypi
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1.14
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          attestations: true
+
+  comment:
+    needs: [publish, build]
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          DEV_VERSION: ${{ needs.build.outputs.dev-version }}
+        with:
+          script: |
+            const devVersion = process.env.DEV_VERSION;
+            const pkgName = 'pydantic-jsonpointer';
+            const body = [
+              '## Test PyPI package published',
+              '',
+              `[${pkgName} ${devVersion}](https://test.pypi.org/project/${pkgName}/${devVersion}/)`,
+              '',
+              'Install with:',
+              '```',
+              `pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ${pkgName}==${devVersion}`,
+              '```',
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });

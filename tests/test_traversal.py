@@ -628,6 +628,7 @@ def test_public_package_exports_full_surface() -> None:
 
     expected = {
         "JsonPointer",
+        "pointer_from_model",
         "Ptr",
         "resolve",
         "get_value",
@@ -673,6 +674,7 @@ def test_public_imports_are_importable_by_name() -> None:
         adapter_for,
         add_value,
         get_value,
+        pointer_from_model,
         register,
         remove_value,
         resolve,
@@ -1432,3 +1434,49 @@ def test_legacy_adapter_real_unwrap_skips_is_value_frozen_probe() -> None:
         assert doc.inner == {"x": 99, "y": 2}
     finally:
         _REGISTRY.pop(_LegacyWrap, None)
+
+
+# ---------------------------------------------------------------------------
+# TupleAdapter integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_get_value_from_tuple() -> None:
+    doc = (10, 20, 30)
+    assert get_value(doc, JsonPointer("/0")) == 10
+    assert get_value(doc, JsonPointer("/2")) == 30
+
+
+def test_get_value_from_nested_tuple() -> None:
+    doc = {"items": (1, 2, 3)}
+    assert get_value(doc, JsonPointer("/items/1")) == 2
+
+
+def test_resolve_tuple_root() -> None:
+    doc = (1, 2, 3)
+    p = resolve(doc, JsonPointer(""))
+    assert p.get() is doc
+
+
+def test_get_value_tuple_out_of_range_raises() -> None:
+    doc = (10, 20)
+    with pytest.raises(PointerNotFoundError):
+        get_value(doc, JsonPointer("/5"))
+
+
+def test_set_value_tuple_raises_immutable() -> None:
+    doc = (1, 2, 3)
+    with pytest.raises(ImmutableTargetError):
+        set_value(doc, JsonPointer("/0"), 99)
+
+
+def test_add_value_tuple_raises_immutable() -> None:
+    doc = (1, 2, 3)
+    with pytest.raises(ImmutableTargetError):
+        add_value(doc, JsonPointer("/0"), 99)
+
+
+def test_remove_value_tuple_raises_immutable() -> None:
+    doc = (1, 2, 3)
+    with pytest.raises(ImmutableTargetError):
+        remove_value(doc, JsonPointer("/0"))
