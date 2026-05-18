@@ -34,7 +34,7 @@ jobs:
         run: |
           DEV_SUFFIX=".dev${{ github.run_number }}${{ github.run_attempt }}"
           BASE_VERSION=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' src/pydantic_jsonpointer/__version__.py)
-          DEV_VERSION=$(python3 -c "from packaging.version import Version; print(Version('${BASE_VERSION}${DEV_SUFFIX}'))")
+          DEV_VERSION=$(uv run --with packaging --no-project python -c "from packaging.version import Version; print(Version('${BASE_VERSION}${DEV_SUFFIX}'))")
           echo "dev-version=${DEV_VERSION}" >> "$GITHUB_OUTPUT"
           sed -i "s/^VERSION = \"\(.*\)\"/VERSION = \"\1${DEV_SUFFIX}\"/" src/pydantic_jsonpointer/__version__.py
 
