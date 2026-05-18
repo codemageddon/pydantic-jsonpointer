@@ -15,6 +15,10 @@ from typing import Any, Callable
 
 from mypy.nodes import Expression, IntExpr, NameExpr, StrExpr, TypeInfo, UnaryExpr, Var
 from mypy.plugin import AttributeContext, MethodSigContext, Plugin
+from mypy.typeops import (  # type: ignore[attr-defined]
+    expand_type_by_instance,
+    map_instance_to_supertype,
+)
 from mypy.types import (
     AnyType,
     Instance,
@@ -58,16 +62,33 @@ def _is_root_model(info: TypeInfo) -> bool:
 def _get_rootmodel_inner_raw(inst: Instance) -> ProperType | None:
     """Return the raw inner type T from a RootModel Instance, not limited to Instance.
 
-    Handles two cases:
+    Handles three cases:
     - Direct ``RootModel[T]`` annotation: reads the type arg from inst.args[0].
-    - Named subclass (e.g. ``TagList(RootModel[list[Item]])``) with no type args:
-      falls back to MRO walk on inst.type.
+    - Named subclass (e.g. ``TagList(RootModel[list[Item]])``) with no type args.
+    - Concrete subclass of a generic RootModel (e.g. ``AddressBox(Box[Address])``
+      where ``Box = RootModel[list[T]]``): uses map_instance_to_supertype to
+      compose substitutions through the full inheritance chain.
 
     Unlike _get_rootmodel_inner, does not restrict the return type to Instance,
     so TupleType and multi-branch UnionType inner types are returned as-is.
     """
     if inst.type.fullname in _ROOTMODEL_FULLNAMES and inst.args:
         return get_proper_type(inst.args[0])
+    # Find the RootModel TypeInfo in the MRO and use map_instance_to_supertype
+    # to resolve TypeVar substitutions through the full inheritance chain.
+    # This correctly handles concrete subclasses like AddressBox(Box[Address])
+    # where Box = RootModel[list[T]] — inst.args is empty, but
+    # map_instance_to_supertype composes T=Address through Wrapper's bases.
+    for mro_type in inst.type.mro:
+        if mro_type.fullname in _ROOTMODEL_FULLNAMES:
+            try:
+                mapped = map_instance_to_supertype(inst, mro_type)
+                if mapped.args:
+                    return get_proper_type(mapped.args[0])
+            except Exception:
+                pass
+            break
+    # Fallback: original MRO base walk for any edge case not covered above.
     for mro_type in inst.type.mro:
         for base in mro_type.bases:
             if not isinstance(base, Instance):
@@ -76,7 +97,10 @@ def _get_rootmodel_inner_raw(inst: Instance) -> ProperType | None:
                 continue
             if not base.args:
                 continue
-            return get_proper_type(base.args[0])
+            inner: Type = base.args[0]
+            if inst.args:
+                inner = expand_type_by_instance(inner, inst)
+            return get_proper_type(inner)
     return None
 
 
@@ -515,7 +539,23 @@ def _hook_modelpath_attr(ctx: AttributeContext, attr_name: str) -> Type:
         # against the now-invalid chain (runtime stops at the first bad access).
         return _make_modelpath_any(mp_type.type)
 
-    field_type = sym.node.type
+    field_type: Type | None = sym.node.type
+    if field_type is not None:
+        if model_instance.args:
+            field_type = expand_type_by_instance(field_type, model_instance)
+        else:
+            # Concrete subclass of a generic BaseModel (no own type args).
+            # Find the declaring class (where the field's TypeVar lives) and map
+            # model_instance to it to get the concrete substitution.
+            # Handles class AddressWrapper(Wrapper[Address]) where item: T in Wrapper.
+            declaring_info: TypeInfo | None = getattr(sym.node, "info", None)
+            if declaring_info is not None and declaring_info is not model_instance.type:
+                try:
+                    mapped = map_instance_to_supertype(model_instance, declaring_info)
+                    if mapped.args:
+                        field_type = expand_type_by_instance(field_type, mapped)
+                except Exception:
+                    pass
     next_model = _advance_attr_mypy(field_type) if field_type is not None else None
 
     if next_model is None:
@@ -580,7 +620,16 @@ def _hook_getitem(ctx: MethodSigContext) -> Any:
                 pending = inner
 
     if isinstance(pending, AnyType):
-        # Context lost, but RFC 6901 token-form validation still applies.
+        if isinstance(model_instance, Instance):
+            # Concrete non-RootModel root with no pending container annotation:
+            # direct indexing is not valid at this position.
+            ctx.api.fail(
+                f"cannot index into '{model_instance.type.name}': "
+                "navigate to a list or tuple field first",
+                ctx.context,
+            )
+            return sig.copy_modified(ret_type=_make_modelpath_any(self_type.type))
+        # Context already lost (AnyType model); RFC 6901 token-form validation only.
         _check_literal_index(ctx)
         return sig
 

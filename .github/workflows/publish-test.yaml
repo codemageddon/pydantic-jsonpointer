@@ -32,7 +32,7 @@ jobs:
       - name: Append dev version suffix
         id: version
         run: |
-          DEV_SUFFIX=".dev${{ github.run_number }}${{ github.run_attempt }}"
+          DEV_SUFFIX=".dev$(( ${{ github.run_number }} * 100 + ${{ github.run_attempt }} ))"
           BASE_VERSION=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' src/pydantic_jsonpointer/__version__.py)
           DEV_VERSION=$(uv run --with packaging --no-project python -c "from packaging.version import Version; print(Version('${BASE_VERSION}${DEV_SUFFIX}'))")
           echo "dev-version=${DEV_VERSION}" >> "$GITHUB_OUTPUT"

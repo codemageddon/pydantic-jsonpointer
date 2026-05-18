@@ -501,6 +501,22 @@ p = pointer_from_model(Wrap).__getitem__(0)
     assert "non-list" in stdout
 
 
+def test_plain_basemodel_root_rejects_index() -> None:
+    """pointer_from_model(User)[0] must be rejected: plain BaseModel has no pending container."""
+    code = (
+        _PREAMBLE
+        + """
+class User(BaseModel):
+    name: str
+
+p = pointer_from_model(User)[0]
+"""
+    )
+    stdout, stderr, exit_code = _run_mypy(code)
+    assert exit_code != 0, f"mypy should have failed: {stdout}"
+    assert "cannot index into" in stdout, stdout
+
+
 def test_union_instance_requires_narrowing() -> None:
     """Ambiguous BaseModel Union is a hard error even on instance entry.
 
@@ -1250,6 +1266,9 @@ q = pointer_from_model(Model).pair["-"][0].city
     stdout, stderr, exit_code = _run_mypy(code)
     # The error is on the ["-"] step; subsequent accesses must not claim city is
     # invalid on Address (which would indicate false model-context recovery).
+    assert exit_code != 0, (
+        f"expected mypy error on ['-'] step, got clean output: {stdout}"
+    )
     assert "'Address' has no field 'city'" not in stdout, stdout
 
 
@@ -1848,6 +1867,100 @@ p = pointer_from_model(Holder).wrapped["-"]
     assert "TupleAdapter" in stdout or "not valid for tuple" in stdout, stdout
 
 
+def test_generic_basemodel_specialized_attr_valid() -> None:
+    """pointer_from_model(Wrapper[Address]).item.city must pass when item: T is resolved to Address."""
+    code = (
+        _PREAMBLE
+        + """
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Address(BaseModel):
+    city: str
+
+class Wrapper(BaseModel, Generic[T]):
+    item: T
+
+p = pointer_from_model(Wrapper[Address]).item.city
+"""
+    )
+    stdout, stderr, exit_code = _run_mypy(code)
+    assert exit_code == 0, f"mypy errors: {stdout}"
+    assert "has no field" not in stdout, stdout
+
+
+def test_generic_basemodel_specialized_attr_invalid() -> None:
+    """pointer_from_model(Wrapper[Address]).item.typo must fail — typo is not on Address."""
+    code = (
+        _PREAMBLE
+        + """
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Address(BaseModel):
+    city: str
+
+class Wrapper(BaseModel, Generic[T]):
+    item: T
+
+p = pointer_from_model(Wrapper[Address]).item.typo
+"""
+    )
+    stdout, stderr, exit_code = _run_mypy(code)
+    assert exit_code != 0, f"mypy should have failed: {stdout}"
+    assert "'Address' has no field 'typo'" in stdout, stdout
+
+
+def test_generic_rootmodel_specialized_index_valid() -> None:
+    """pointer_from_model(Box[Address])[0].city must pass for class Box(RootModel[list[T]])."""
+    code = (
+        _PREAMBLE
+        + """
+from typing import Generic, TypeVar
+from pydantic import RootModel
+
+T = TypeVar("T")
+
+class Address(BaseModel):
+    city: str
+
+class Box(RootModel[list[T]], Generic[T]):
+    pass
+
+p = pointer_from_model(Box[Address])[0].city
+"""
+    )
+    stdout, stderr, exit_code = _run_mypy(code)
+    assert exit_code == 0, f"mypy errors: {stdout}"
+    assert "has no field" not in stdout, stdout
+
+
+def test_generic_rootmodel_specialized_index_invalid() -> None:
+    """pointer_from_model(Box[Address])[0].typo must fail — typo is not on Address."""
+    code = (
+        _PREAMBLE
+        + """
+from typing import Generic, TypeVar
+from pydantic import RootModel
+
+T = TypeVar("T")
+
+class Address(BaseModel):
+    city: str
+
+class Box(RootModel[list[T]], Generic[T]):
+    pass
+
+p = pointer_from_model(Box[Address])[0].typo
+"""
+    )
+    stdout, stderr, exit_code = _run_mypy(code)
+    assert exit_code != 0, f"mypy should have failed: {stdout}"
+    assert "'Address' has no field 'typo'" in stdout, stdout
+
+
 def test_optional_rootmodel_tuple_index_no_false_positive() -> None:
     """Optional[RootModel[tuple[A, B]]][0].city must pass without 'non-list' error.
 
@@ -1875,3 +1988,119 @@ p = pointer_from_model(Holder).wrapped[0].city
     stdout, stderr, exit_code = _run_mypy(code)
     assert exit_code == 0, f"mypy errors: {stdout}"
     assert "non-list" not in stdout, stdout
+
+
+def test_concrete_subclass_generic_basemodel_attr_valid() -> None:
+    """pointer_from_model(AddressWrapper).item.city must pass.
+
+    AddressWrapper inherits from Wrapper[Address] where Wrapper(BaseModel, Generic[T])
+    declares item: T.  The plugin must compose T=Address through the inheritance chain
+    so that .item resolves to Address and .city is validated against it.
+    """
+    code = (
+        _PREAMBLE
+        + """
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Address(BaseModel):
+    city: str
+
+class Wrapper(BaseModel, Generic[T]):
+    item: T
+
+class AddressWrapper(Wrapper[Address]):
+    pass
+
+p = pointer_from_model(AddressWrapper).item.city
+"""
+    )
+    stdout, stderr, exit_code = _run_mypy(code)
+    assert exit_code == 0, f"mypy errors: {stdout}"
+    assert "has no field" not in stdout, stdout
+
+
+def test_concrete_subclass_generic_basemodel_attr_invalid() -> None:
+    """pointer_from_model(AddressWrapper).item.typo must fail when typo is not on Address."""
+    code = (
+        _PREAMBLE
+        + """
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Address(BaseModel):
+    city: str
+
+class Wrapper(BaseModel, Generic[T]):
+    item: T
+
+class AddressWrapper(Wrapper[Address]):
+    pass
+
+p = pointer_from_model(AddressWrapper).item.typo
+"""
+    )
+    stdout, stderr, exit_code = _run_mypy(code)
+    assert exit_code != 0, f"mypy should have failed: {stdout}"
+    assert "'Address' has no field 'typo'" in stdout, stdout
+
+
+def test_concrete_subclass_generic_rootmodel_index_valid() -> None:
+    """pointer_from_model(AddressBox)[0].city must pass.
+
+    AddressBox inherits from Box[Address] where Box(RootModel[list[T]], Generic[T]).
+    The plugin must compose T=Address through the inheritance chain so that [0]
+    resolves to Address and .city is validated against it.
+    """
+    code = (
+        _PREAMBLE
+        + """
+from typing import Generic, TypeVar
+from pydantic import RootModel
+
+T = TypeVar("T")
+
+class Address(BaseModel):
+    city: str
+
+class Box(RootModel[list[T]], Generic[T]):
+    pass
+
+class AddressBox(Box[Address]):
+    pass
+
+p = pointer_from_model(AddressBox)[0].city
+"""
+    )
+    stdout, stderr, exit_code = _run_mypy(code)
+    assert exit_code == 0, f"mypy errors: {stdout}"
+    assert "has no field" not in stdout, stdout
+
+
+def test_concrete_subclass_generic_rootmodel_index_invalid() -> None:
+    """pointer_from_model(AddressBox)[0].typo must fail when typo is not on Address."""
+    code = (
+        _PREAMBLE
+        + """
+from typing import Generic, TypeVar
+from pydantic import RootModel
+
+T = TypeVar("T")
+
+class Address(BaseModel):
+    city: str
+
+class Box(RootModel[list[T]], Generic[T]):
+    pass
+
+class AddressBox(Box[Address]):
+    pass
+
+p = pointer_from_model(AddressBox)[0].typo
+"""
+    )
+    stdout, stderr, exit_code = _run_mypy(code)
+    assert exit_code != 0, f"mypy should have failed: {stdout}"
+    assert "'Address' has no field 'typo'" in stdout, stdout

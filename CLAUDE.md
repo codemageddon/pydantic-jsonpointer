@@ -45,7 +45,7 @@ Six-class hierarchy with intentional multiple inheritance so callers can catch u
 - `@runtime_checkable Protocol ContainerAdapter` with eight required methods: `resolve_token`, `has`, `get`, `set`, `add`, `remove`, `unwrap`, `is_step_frozen`. Adapters MAY additionally define `is_value_frozen(value) -> bool` (a second freeze-taint source, see `traversal.py`); the hook is deliberately outside the Protocol surface so legacy 8-method adapters keep satisfying `isinstance(adapter, ContainerAdapter)` and static type-checks against `register()`. The walker probes for it via `getattr` and treats its absence as `False`.
 - Module-level `_REGISTRY: dict[type, ContainerAdapter]`. Treat as read-mostly: populate at import time via `register()`. Tests snapshot/restore via an autouse fixture in `test_adapters.py`.
 - `register(cls, adapter, *, override=False)` — raises `ValueError` on duplicate unless `override=True`.
-- `adapter_for(value, *, resolver=None)` walks `type(value).__mro__`. When a non-None `resolver` is supplied and the registered adapter is a `BaseModelAdapter`, returns a per-call `BaseModelAdapter(resolver=resolver)` (no registry mutation).
+- `adapter_for(value, *, resolver=None)` walks `type(value).__mro__`. When a non-None `resolver` is supplied and the registered adapter is a `BaseModelAdapter`, returns a per-call clone via `adapter.with_resolver(resolver)` — a shallow copy of the registered instance with `_resolver` substituted (no registry mutation). Subclasses with extra state that needs non-shallow copy must override `with_resolver`.
 - Built-in `DictAdapter`, `ListAdapter`, and `TupleAdapter` self-register at module load. `ListAdapter.resolve_token` enforces RFC 6901 array index shape: ASCII decimal digits only (rejects non-ASCII digits like Arabic-Indic via `_is_ascii_digits`), no leading zero except single `"0"`, plus the `"-"` tail marker. Index helpers reject `bool` keys via `_is_int_index` (since `isinstance(True, int)` would otherwise silently accept `True`/`False` as `1`/`0`). `TupleAdapter` is read-only: `set`, `add`, and `remove` always raise `ImmutableTargetError`; `is_step_frozen` returns `False` so mutable objects inside tuple slots remain writable via their own adapters. Tuples do not support the `"-"` tail marker (rejected by `resolve_token`).
 
 ### `pydantic_adapter.py`
@@ -84,7 +84,7 @@ When adding new operations (e.g., a parent pointer back-walker, JSON Patch dispa
 
 - Ships `ModelPathPlugin(Plugin)` with two hooks registered via `get_attribute_hook` and `get_method_signature_hook`.
 - `get_attribute_hook` fires for every `_ModelPath.<attr>` access. Validates the attribute name against the current model, emits `api.fail(...)` for unknown fields, and constructs a parametrized `_ModelPath[next_T, field_type]` return type via direct `Instance(typeinfo, args)` construction so further chaining types correctly. Chained `.attr` access is fully validated at every depth.
-- `get_method_signature_hook` fires for `_ModelPath.__getitem__` calls (both explicit `.__getitem__(0)` and implicit `[0]` syntax). Validates that the pending type is list-like and returns a signature whose `ret_type` carries the advanced item model.
+- `get_method_signature_hook` fires for `_ModelPath.__getitem__` calls (both explicit `.__getitem__(0)` and implicit `[0]` syntax). Validates that the pending type is a list or tuple (both are accepted indexed containers) and returns a signature whose `ret_type` carries the advanced item model.
 - Instance-based Union narrowing through the chain is no longer a runtime feature, so the plugin emits a hard type error (`api.fail`) on ambiguous BaseModel Unions pointing users to `isinstance` narrowing.
 - The plugin is **opt-in** and not listed in this project's own `pyproject.toml`. Users enable it: `plugins = "pydantic_jsonpointer.mypy_plugin"` in their `mypy` config.
 
@@ -98,11 +98,3 @@ When adding new operations (e.g., a parent pointer back-walker, JSON Patch dispa
 ## Public API surface
 
 `src/pydantic_jsonpointer/__init__.py` re-exports the canonical 22 names listed in `__all__`: `JsonPointer`, `pointer_from_model`, `Ptr`, `resolve`, `get_value`, `set_value`, `add_value`, `remove_value`, `ContainerAdapter`, `register`, `adapter_for`, `FieldResolver`, `ByAttribute`, `BySerializationAlias`, `ByValidationAlias`, `BaseModelAdapter`, plus the six error classes. Importing the package **side-effect-registers** `BaseModelAdapter` against `pydantic.BaseModel` with `override=True` so `importlib.reload(pydantic_jsonpointer)` is safe. Agents touching `__init__.py` must preserve that registration line.
-
-## Design references
-
-- Authoritative design spec: `docs/superpowers/specs/2026-05-13-pointer-traversal-design.md`.
-- Code-level companion plan: `docs/superpowers/plans/2026-05-14-pointer-traversal.md`.
-- Ralphex execution checklist: `docs/plans/2026-05-14-pointer-traversal.md` (all 14 tasks completed).
-- Model-attribute pointer builder spec: `docs/superpowers/specs/2026-05-15-model-attribute-pointer-builder.md`.
-- Mypy-friendly `_ModelPath` spec: `docs/superpowers/specs/2026-05-15-modelpath-mypy-friendly.md`.

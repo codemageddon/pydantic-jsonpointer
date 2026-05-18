@@ -222,7 +222,7 @@ def test_modelpath_getattr_advances_model_for_nested() -> None:
 
 
 def test_modelpath_getattr_unknown_field_raises_attributeerror() -> None:
-    with pytest.raises(AttributeError):
+    with pytest.raises(AttributeError, match="has no field 'typo'"):
         _ = _ModelPath(_model_cls=_User, _resolver=BySerializationAlias()).typo
 
 
@@ -428,7 +428,7 @@ def test_from_model_union_ambiguous_without_instance() -> None:
     ptr = pointer_from_model(_Event).payload
     assert str(ptr) == "/payload"
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(AttributeError, match="model type context was lost"):
         pointer_from_model(_Event).payload.body
 
 
@@ -497,10 +497,10 @@ def test_from_model_resolver_threads_through_nested_models() -> None:
 
 
 def test_from_model_rejects_non_basemodel() -> None:
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="expects a BaseModel class or instance"):
         pointer_from_model(str)  # type: ignore[type-var]
 
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="expects a BaseModel class or instance"):
         pointer_from_model(123)  # type: ignore[call-overload]
 
 
@@ -807,6 +807,31 @@ def test_modelpath_build_callable_via_call_when_build_is_field() -> None:
     assert isinstance(result, JsonPointer)
     assert str(result) == "/build"
     assert result.tokens == ("build",)
+
+
+def test_modelpath_build_callable_when_context_lost_and_build_is_field() -> None:
+    class _Widget(BaseModel):
+        build: str
+        version: int
+
+    # After navigating to 'version' (a leaf str field), _model_ctx_lost=True.
+    # .build() must still finalize the pointer, not route to the 'build' field.
+    mp = _ModelPath(_model_cls=_Widget, _resolver=BySerializationAlias()).version
+    assert mp._model_ctx_lost is True
+    result = mp.build()
+    assert isinstance(result, JsonPointer)
+    assert str(result) == "/version"
+
+
+def test_modelpath_getitem_rejects_indexing_plain_model_root() -> None:
+    """pointer_from_model(User)[0] must raise TypeError: plain BaseModel cannot be indexed directly."""
+
+    class _User(BaseModel):
+        name: str
+
+    mp = _ModelPath(_model_cls=_User, _resolver=BySerializationAlias())
+    with pytest.raises(TypeError, match="cannot index into"):
+        mp[0]
 
 
 def test_modelpath_getitem_rejects_bool_index() -> None:

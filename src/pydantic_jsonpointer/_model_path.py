@@ -264,10 +264,14 @@ class _ModelPath(Generic[_T, _P]):
     def __getattribute__(self, name: str) -> Any:
         # Model fields take priority over class-defined methods/attributes so
         # fields named e.g. 'build' are reachable via attribute chaining.
+        # Skip field routing when context is lost — the user is calling a class
+        # method (e.g. build()) to finalize, not navigating a field.
         if not name.startswith("_"):
-            model_cls: type[BaseModel] = object.__getattribute__(self, "_model_cls")
-            if name in model_cls.model_fields:
-                return _ModelPath.__getattr__(self, name)
+            model_ctx_lost: bool = object.__getattribute__(self, "_model_ctx_lost")
+            if not model_ctx_lost:
+                model_cls: type[BaseModel] = object.__getattribute__(self, "_model_cls")
+                if name in model_cls.model_fields:
+                    return _ModelPath.__getattr__(self, name)
         return object.__getattribute__(self, name)
 
     def build(self) -> JsonPointer:
@@ -326,6 +330,11 @@ class _ModelPath(Generic[_T, _P]):
         )
 
     def __getitem__(self, index: int | str) -> _ModelPath[Any, Any]:
+        if self._pending_annotation is None and not self._model_ctx_lost:
+            raise TypeError(
+                f"cannot index into {self._model_cls.__name__!r}: "
+                "navigate to a list or tuple field first"
+            )
         if not isinstance(index, (int, str)):
             raise TypeError(
                 f"list index must be int or str, got {type(index).__name__!r}"
