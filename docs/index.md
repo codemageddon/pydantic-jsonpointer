@@ -1,6 +1,6 @@
-<p align="center">
-  <img src="assets/logo.png" alt="pydantic-jsonpointer logo" width="180">
-</p>
+<div style="text-align: center; line-height: 1;">
+  <img src="assets/logo-header.png" alt="" width="194" height="96" style="display: inline-block; margin-bottom: 8px;">
+</div>
 
 # pydantic-jsonpointer
 

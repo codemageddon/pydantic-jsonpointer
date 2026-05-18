@@ -1,5 +1,27 @@
 /* pydantic-jsonpointer documentation custom styles */
 
+/* Darker primary teal for better contrast with white text.
+   Default teal (#009688) → white contrast 3.77:1 (fails WCAG AA normal).
+   Teal 700 (#00796b) → white contrast 5.27:1 (passes AA for normal text). */
+.md-header,
+.md-tabs {
+  background-color: #00796b !important;
+}
+
 .md-typeset pre {
   max-width: 100%;
+}
+
+/* Header logo — light backdrop for visibility on teal header */
+.md-header .md-logo img {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  padding: 3px;
+  height: 2.2rem;
+  width: auto;
+}
+
+/* Body SVG logo — text color follows page theme via currentColor */
+.logo-body {
+  color: var(--md-default-fg-color);
 }
